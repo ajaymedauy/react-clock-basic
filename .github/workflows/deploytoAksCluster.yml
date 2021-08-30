@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: acrpchdev.azurecr.io
+        username: ${{ secrets.acr_acrpchdev_username }}
+        password: ${{ secrets.acr_acrpchdev_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/" -f  "Dockerfile" -t acrpchdev.azurecr.io/knpchdev:${{ github.sha }} --label dockerfile-path=Dockerfile
+        docker push acrpchdev.azurecr.io/knpchdev:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_knpchdev_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep knpchdev97f4 | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace knpchdev97f4`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: knpchdev97f4
+        container-registry-url: acrpchdev.azurecr.io
+        container-registry-username: ${{ secrets.acr_acrpchdev_username }}
+        container-registry-password: ${{ secrets.acr_acrpchdev_password }}
+        secret-name: knpchdevdockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: knpchdev97f4
+        manifests: |
+          manifests/deployment-3.yml
+          manifests/service-3.yml
+        images: |
+          acrpchdev.azurecr.io/knpchdev:${{ github.sha }}
+        imagepullsecrets: |
+          knpchdevdockerauth
