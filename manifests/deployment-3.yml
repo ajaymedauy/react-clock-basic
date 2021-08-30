@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "knpchdev-5073"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "knpchdev-5073"
+  template:
+    metadata:
+      labels:
+        app: "knpchdev-5073"
+    spec:
+      containers:
+        - name: "knpchdev-5073"
+          image: "acrpchdev.azurecr.io/knpchdev"
+          ports:
+          - containerPort: 8080
